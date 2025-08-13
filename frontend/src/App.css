@@ -1,0 +1,48 @@
+/* Custom styles for the football simulator app */
+
+.football-green {
+  background-color: #16a34a;
+}
+
+.football-darkgreen {
+  background-color: #15803d;
+}
+
+/* Animation for loading spinners */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Custom scrollbar styles */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #374151;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #6b7280;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* Additional custom styles for football simulator */
+.team-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+.match-result {
+  box-shadow: 0 4px 15px rgba(34, 197, 94, 0.2);
+}

@@ -1,0 +1,47 @@
+{
+    "tournament_settings": {
+        "name": "Enhanced Champions League",
+        "format": "knockout",
+        "match_duration_seconds": 9,
+        "enable_penalties": true,
+        "enable_detailed_stats": true
+    },
+    "simulation_settings": {
+        "goal_probability_base": 0.15,
+        "card_probability": 0.10,
+        "home_advantage_default": 5,
+        "penalty_success_rate_base": 0.80,
+        "assist_probability": 0.70
+    },
+    "ml_settings": {
+        "training_samples": 1000,
+        "model_type": "logistic_regression",
+        "feature_weights": {
+            "team_strength": 1.0,
+            "squad_value": 0.1,
+            "form_difference": 0.1,
+            "home_advantage": 1.0
+        }
+    },
+    "display_settings": {
+        "show_pre_match_analysis": true,
+        "show_detailed_lineups": true,
+        "show_match_predictions": true,
+        "show_post_match_stats": true,
+        "enable_commentary": true
+    },
+    "team_chemistry_ranges": {
+        "excellent": [90, 100],
+        "good": [75, 89],
+        "average": [60, 74],
+        "poor": [40, 59],
+        "terrible": [0, 39]
+    },
+    "player_form_effects": {
+        "excellent_form": [9, 10],
+        "good_form": [7, 8],
+        "average_form": [5, 6],
+        "poor_form": [3, 4],
+        "terrible_form": [1, 2]
+    }
+}
