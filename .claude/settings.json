@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tail -8 \"C:\\\\\\\\Users\\\\\\\\Alessio\\\\\\\\AppData\\\\\\\\Local\\\\\\\\Temp\\\\\\\\claude\\\\\\\\c--Users-Alessio-OneDrive-Desktop-football-simulator\\\\\\\\4ab1b7ab-bf10-4904-be7c-cac55082666a\\\\\\\\tasks\\\\\\\\bdrl17qt0.output\")",
+      "Bash(sleep 12 && tail -20 /tmp/frontend.log)",
+      "Read(//tmp/**)"
+    ]
+  }
+}

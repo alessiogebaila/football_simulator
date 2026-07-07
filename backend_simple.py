@@ -36,6 +36,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Real-data prediction engine (Dixon-Coles + Elo + Monte Carlo), mounted at /engine
+try:
+    from engine.api import router as engine_router
+    app.include_router(engine_router)
+    logger = logging.getLogger(__name__)
+    logger.info("Prediction engine mounted at /engine")
+except Exception as engine_exc:  # engine data may not be ingested yet
+    logging.getLogger(__name__).warning(f"Prediction engine not mounted: {engine_exc}")
+
 # Data models
 @dataclass
 class Player:

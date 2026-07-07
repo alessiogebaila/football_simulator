@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { Zap, Target, Activity, Users, Shirt } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Zap, Target, Activity, Users } from 'lucide-react'
 import { Team, Match, MatchEvent, Player } from '../types'
+import FormationPitch from '../components/FormationPitch'
 import api from '../services/api'
 import toast from 'react-hot-toast'
 
@@ -29,6 +31,7 @@ const MatchSimulator: React.FC = () => {
   const [awayFormation, setAwayFormation] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [simulationSpeed, setSimulationSpeed] = useState<number>(200) // milliseconds per minute (Normal = 5 min/sec)
+  const [goalCelebration, setGoalCelebration] = useState<{ player: string; team: string; minute: number } | null>(null)
 
   useEffect(() => {
     fetchTeams()
@@ -66,12 +69,8 @@ const MatchSimulator: React.FC = () => {
             // Default to regular toast
             switch (event.event_type) {
               case 'goal':
-                toastMessage = `⚽ GOAL! ${event.player} (${event.team})`
-                if (event.team === homeTeam) {
-                  toast.success(toastMessage, { duration: 3000, position: 'bottom-right' })
-                } else {
-                  toast.error(toastMessage, { duration: 3000, position: 'bottom-right' })
-                }
+                setGoalCelebration({ player: event.player, team: event.team, minute: event.minute })
+                setTimeout(() => setGoalCelebration(null), 2600)
                 break
               case 'yellow_card':
                 toastMessage = `🟨 Yellow card: ${event.player} (${event.team})`
@@ -228,353 +227,6 @@ const MatchSimulator: React.FC = () => {
     }
   }
 
-  const renderPlayerCard = (player: Player, isHome: boolean = true) => {
-    const getPositionColor = (position: string) => {
-      switch (position) {
-        case 'GK': return 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30'
-        case 'CB':
-        case 'LB': 
-        case 'RB': return 'bg-blue-500/20 text-blue-300 border-blue-500/30'
-        case 'CDM':
-        case 'CM':
-        case 'CAM': return 'bg-green-500/20 text-green-300 border-green-500/30'
-        case 'LW':
-        case 'RW':
-        case 'ST':
-        case 'CF': return 'bg-red-500/20 text-red-300 border-red-500/30'
-        default: return 'bg-gray-500/20 text-gray-300 border-gray-500/30'
-      }
-    }
-
-    // Use fixed width for cards to ensure consistent sizing
-    const cardSize = 'w-16 p-2'
-    const textSize = 'text-xs'
-    
-    // Apply rotation based on team: home team faces right, away team faces left
-    // Counter-rotate the cards so text remains readable
-    const rotationClass = isHome ? 'transform -rotate-90' : 'transform rotate-90'
-    
-    // Check for player events
-    const playerEvents = match && match.events ? match.events.filter(e => 
-      (e.player === player.name || e.player.startsWith(player.name + ' →'))
-    ) : [];
-    
-    const hasGoal = playerEvents.some(e => e.event_type === 'goal');
-    const hasYellowCard = playerEvents.some(e => e.event_type === 'yellow_card');
-    const hasRedCard = playerEvents.some(e => e.event_type === 'red_card');
-    const isSubbedOut = playerEvents.some(e => e.event_type === 'substitution' && e.player.startsWith(player.name + ' →'));
-    const isSubbedIn = match && match.events ? match.events.some(e => 
-      e.event_type === 'substitution' && e.player.includes('→ ' + player.name)
-    ) : false;
-    
-    // Extract last name or first name if no space
-    const lastName = player.name.includes(' ') ? 
-      player.name.split(' ').slice(-1)[0] : 
-      player.name;
-
-    return (
-      <div className="relative flex flex-col items-center">
-        {/* Event indicators above player card */}
-        {(hasGoal || hasYellowCard || hasRedCard || isSubbedOut || isSubbedIn) && (
-          <div className="absolute -top-2 left-0 right-0 flex justify-center gap-1 z-10">
-            {hasGoal && <span className="bg-green-900/80 text-white text-xs rounded-sm h-5 w-5 flex items-center justify-center">⚽</span>}
-            {hasYellowCard && <span className="bg-yellow-500/80 text-white text-xs px-1.5 py-0.5 flex items-center justify-center" style={{height: '12px', width: '8px'}}></span>}
-            {hasRedCard && <span className="bg-red-500/80 text-white text-xs px-1.5 py-0.5 flex items-center justify-center" style={{height: '12px', width: '8px'}}></span>}
-            {(isSubbedOut || isSubbedIn) && <span className="bg-blue-500/80 text-white text-xs rounded-sm h-5 w-5 flex items-center justify-center">🔄</span>}
-          </div>
-        )}
-        
-        {/* Player card with fixed dimensions */}
-        <div className={`${cardSize} ${isSubbedOut ? 'opacity-50' : ''} ${rotationClass} bg-gray-800/80 backdrop-blur-sm rounded-sm border ${getPositionColor(player.position)} transition-all hover:scale-105`}>
-          <div className="text-center">
-            <div className={`${textSize} opacity-80`}>
-              {player.position}
-            </div>
-            {player.kit_number !== '-' && (
-              <div className={`${textSize} text-gray-400`}>
-                #{player.kit_number}
-              </div>
-            )}
-          </div>
-        </div>
-        
-        {/* Player name positioned below the card */}
-        <div className="mt-1 text-center">
-          <span className="text-[10px] font-medium text-white bg-gray-800/70 px-1 py-0.5 rounded">
-            {lastName}
-          </span>
-        </div>
-      </div>
-    )
-  }
-
-  const renderFormation = (lineup: Player[], teamName: string, isHome: boolean, formation: string) => {
-    // Formation-specific positioning logic
-    const getFormationLayout = (formation: string, players: Player[]) => {
-      const goalkeeper = players.find(p => p.position === 'GK')
-      
-      // Special handling for Barcelona - make sure CDMs are shown as CMs in 4-2-3-1
-      if (teamName.includes('Barcelona') && (formation === '4-2-3-1' || formation === '4-3-2-1')) {
-        players.forEach(player => {
-          if (player.position === 'CDM') player.position = 'CM'
-        })
-      }
-      
-      // Special handling for Real Madrid - ensure CDMs are positioned correctly in midfield line
-      if (teamName.includes('Real Madrid') && formation === '4-3-1-2') {
-        // Adjust positioning for Real Madrid's midfield
-        const cdmPlayers = players.filter(p => p.position === 'CDM')
-        if (cdmPlayers.length > 0) {
-          // Keep one CDM as CDM, convert others to CM to place them in the midfield line
-          if (cdmPlayers.length > 1) {
-            cdmPlayers.slice(1).forEach(p => p.position = 'CM')
-          }
-        }
-      }
-      
-      // For away team, swap LB/RB and LW/RW to mirror the formation
-      const defenders = players.filter(p => ['CB', 'LB', 'RB'].includes(p.position))
-      
-      // If away team, swap wingers and fullbacks to mirror formations
-      if (!isHome) {
-        defenders.forEach(player => {
-          if (player.position === 'LB') player.position = 'RB'
-          else if (player.position === 'RB') player.position = 'LB'
-        })
-      }
-      
-      const midfielders = players.filter(p => ['CDM', 'CM', 'CAM', 'LW', 'RW'].includes(p.position))
-      
-      // Mirror LW/RW for away team
-      if (!isHome) {
-        midfielders.forEach(player => {
-          if (player.position === 'LW') player.position = 'RW'
-          else if (player.position === 'RW') player.position = 'LW'
-        })
-      }
-      
-      const attackers = players.filter(p => ['ST', 'CF'].includes(p.position))
-
-      let lines = []
-
-      switch (formation) {
-        case "4-3-3":
-          lines = [
-            { type: 'attack', players: attackers.slice(0, 1), layout: 'center' },
-            { type: 'wings', players: midfielders.filter(p => ['LW', 'RW'].includes(p.position)), layout: 'wide' },
-            { type: 'midfield', players: midfielders.filter(p => ['CDM', 'CM'].includes(p.position)).slice(0, 3), layout: 'center' },
-            { type: 'defense', players: defenders, layout: 'defense' },
-            { type: 'goalkeeper', players: [goalkeeper].filter(Boolean), layout: 'goalkeeper' }
-          ]
-          break
-
-        case "4-2-3-1":
-          lines = [
-            { type: 'attack', players: attackers.slice(0, 1), layout: 'center' },
-            { type: 'attacking', players: [
-              ...midfielders.filter(p => p.position === 'LW').slice(0, 1),
-              ...midfielders.filter(p => p.position === 'CAM').slice(0, 1),
-              ...midfielders.filter(p => p.position === 'RW').slice(0, 1)
-            ], layout: 'attacking-line' },
-            { type: 'defensive-mid', players: midfielders.filter(p => ['CDM', 'CM'].includes(p.position)).slice(0, 2), layout: 'center' },
-            { type: 'defense', players: defenders, layout: 'defense' },
-            { type: 'goalkeeper', players: [goalkeeper].filter(Boolean), layout: 'goalkeeper' }
-          ]
-          break
-
-        case "4-4-2":
-          lines = [
-            { type: 'attack', players: attackers.slice(0, 2), layout: 'center' },
-            { type: 'midfield-flat', players: [
-              ...midfielders.filter(p => p.position === 'LW').slice(0, 1),
-              ...midfielders.filter(p => p.position === 'CM').slice(0, 2),
-              ...midfielders.filter(p => p.position === 'RW').slice(0, 1)
-            ], layout: 'flat-four' },
-            { type: 'defense', players: defenders, layout: 'defense' },
-            { type: 'goalkeeper', players: [goalkeeper].filter(Boolean), layout: 'center' }
-          ]
-          break
-
-        case "3-4-2-1":
-          lines = [
-            { type: 'attack', players: attackers.slice(0, 1), layout: 'center' },
-            { type: 'attacking', players: midfielders.filter(p => p.position === 'CAM').slice(0, 2), layout: 'center' },
-            { type: 'midfield-flat', players: [
-              ...midfielders.filter(p => ['LW', 'LB'].includes(p.position)).slice(0, 1),
-              ...midfielders.filter(p => p.position === 'CM').slice(0, 2),
-              ...midfielders.filter(p => ['RW', 'RB'].includes(p.position)).slice(0, 1)
-            ], layout: 'flat-four' },
-            { type: 'defense', players: defenders.filter(p => p.position === 'CB').slice(0, 3), layout: 'center' },
-            { type: 'goalkeeper', players: [goalkeeper].filter(Boolean), layout: 'center' }
-          ]
-          break
-
-        case "3-5-2":
-          lines = [
-            { type: 'attack', players: attackers.slice(0, 2), layout: 'center' },
-            { type: 'midfield-five', players: [
-              ...midfielders.filter(p => ['LW', 'LB'].includes(p.position)).slice(0, 1),
-              ...midfielders.filter(p => p.position === 'CDM').slice(0, 1),
-              ...midfielders.filter(p => p.position === 'CM').slice(0, 2),
-              ...midfielders.filter(p => ['RW', 'RB'].includes(p.position)).slice(0, 1)
-            ], layout: 'flat-five' },
-            { type: 'defense', players: defenders.filter(p => p.position === 'CB').slice(0, 3), layout: 'center' },
-            { type: 'goalkeeper', players: [goalkeeper].filter(Boolean), layout: 'center' }
-          ]
-          break
-
-        case "4-3-1-2":
-          lines = [
-            { type: 'attack', players: attackers.slice(0, 2), layout: 'center' },
-            { type: 'attacking', players: midfielders.filter(p => p.position === 'CAM').slice(0, 1), layout: 'center' },
-            { type: 'midfield', players: midfielders.filter(p => ['CDM', 'CM'].includes(p.position)).slice(0, 3), layout: 'center' },
-            { type: 'defense', players: defenders, layout: 'defense' },
-            { type: 'goalkeeper', players: [goalkeeper].filter(Boolean), layout: 'center' }
-          ]
-          break
-
-        default:
-          lines = [
-            { type: 'attack', players: attackers.slice(0, 1), layout: 'center' },
-            { type: 'wings', players: midfielders.filter(p => ['LW', 'RW'].includes(p.position)), layout: 'wide' },
-            { type: 'midfield', players: midfielders.filter(p => ['CDM', 'CM'].includes(p.position)).slice(0, 3), layout: 'center' },
-            { type: 'defense', players: defenders, layout: 'defense' },
-            { type: 'goalkeeper', players: [goalkeeper].filter(Boolean), layout: 'center' }
-          ]
-      }
-
-      return lines.filter(line => line.players.length > 0)
-    }
-
-    const renderLine = (line: any, index: number) => {
-      const { players, layout } = line
-      if (!players || players.length === 0) return null
-
-      switch (layout) {
-        case 'wide':
-          return (
-            <div key={index} className="flex justify-between items-center px-16 mb-6 relative">
-              {players.map((player: Player, pIndex: number) => (
-                <div key={`${line.type}-${pIndex}`} className={`flex-shrink-0 ${pIndex === 0 ? 'absolute left-4' : 'absolute right-4'}`}>
-                  {renderPlayerCard(player, isHome)}
-                </div>
-              ))}
-            </div>
-          )
-
-        case 'attacking-line':
-          return (
-            <div key={index} className="flex justify-between items-center px-8 mb-6 relative">
-              {players.slice(0, 1).map((player: Player, pIndex: number) => (
-                <div key={`lw-${pIndex}`} className="absolute left-4">
-                  {renderPlayerCard(player, isHome)}
-                </div>
-              ))}
-              {players.slice(1, 2).map((player: Player, pIndex: number) => (
-                <div key={`cam-${pIndex}`} className="mx-auto">
-                  {renderPlayerCard(player, isHome)}
-                </div>
-              ))}
-              {players.slice(2, 3).map((player: Player, pIndex: number) => (
-                <div key={`rw-${pIndex}`} className="absolute right-4">
-                  {renderPlayerCard(player, isHome)}
-                </div>
-              ))}
-            </div>
-          )
-
-        case 'defense':
-          return (
-            <div key={index} className="flex justify-between items-center px-4 mb-6">
-              {players.map((player: Player, pIndex: number) => {
-                let positionClass = ""
-                if (player.position === 'LB') positionClass = "mr-auto"
-                else if (player.position === 'RB') positionClass = "ml-auto"
-                else if (player.position === 'CB' && pIndex === 1) positionClass = "mx-6"
-                else if (player.position === 'CB' && pIndex === 2) positionClass = "mx-6"
-                
-                return (
-                  <div key={`def-${pIndex}`} className={`flex-shrink-0 ${positionClass}`}>
-                    {renderPlayerCard(player, isHome)}
-                  </div>
-                )
-              })}
-            </div>
-          )
-
-        case 'flat-four':
-          return (
-            <div key={index} className="flex justify-between items-center px-8 mb-6">
-              {players.map((player: Player, pIndex: number) => (
-                <div key={`mid-${pIndex}`} className="flex-shrink-0">
-                  {renderPlayerCard(player, isHome)}
-                </div>
-              ))}
-            </div>
-          )
-
-        case 'flat-five':
-          return (
-            <div key={index} className="flex justify-between items-center px-4 mb-6">
-              {players.map((player: Player, pIndex: number) => (
-                <div key={`mid5-${pIndex}`} className="flex-shrink-0">
-                  {renderPlayerCard(player, isHome)}
-                </div>
-              ))}
-            </div>
-          )
-
-        case 'goalkeeper':
-          return (
-            <div key={index} className="flex justify-center items-center mb-0">
-              {players.map((player: Player, pIndex: number) => (
-                <div key={`gk-${pIndex}`} className="flex-shrink-0">
-                  {renderPlayerCard(player, isHome)}
-                </div>
-              ))}
-            </div>
-          )
-
-        default:
-          return (
-            <div key={index} className="flex justify-center items-center gap-6 mb-6">
-              {players.map((player: Player, pIndex: number) => (
-                <div key={`${line.type}-${pIndex}`} className="flex-shrink-0">
-                  {renderPlayerCard(player, isHome)}
-                </div>
-              ))}
-            </div>
-          )
-      }
-    }
-
-    const formationLines = getFormationLayout(formation, lineup)
-    
-    // For home team: normal formation, then rotate 90 degrees
-    // For away team: normal formation (strikers face up), then rotate -90 degrees
-    const displayLines = formationLines
-
-    return (
-      <div className="relative">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className={`text-xl font-bold flex items-center gap-2 ${isHome ? 'text-blue-400' : 'text-red-400'}`}>
-            <Shirt size={20} />
-            {teamName}
-          </h3>
-          <div className={`px-3 py-1 rounded-full text-sm font-semibold ${isHome ? 'bg-blue-500/20 text-blue-300' : 'bg-red-500/20 text-red-300'}`}>
-            {formation}
-          </div>
-        </div>
-        
-        <div className={`relative rounded-lg p-4 min-h-[500px] ${isHome ? 'transform rotate-90' : 'transform -rotate-90'}`}>
-          <div className="relative h-full flex flex-col justify-between py-6">
-            {displayLines.map((line, index) => renderLine(line, index))}
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -587,6 +239,49 @@ const MatchSimulator: React.FC = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      {/* Goal celebration overlay */}
+      <AnimatePresence>
+        {goalCelebration && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center pointer-events-none"
+          >
+            <motion.div
+              initial={{ scale: 0.4, rotate: -8, opacity: 0 }}
+              animate={{ scale: 1, rotate: 0, opacity: 1 }}
+              exit={{ scale: 1.15, opacity: 0 }}
+              transition={{ type: 'spring', bounce: 0.55, duration: 0.7 }}
+              className={`relative px-10 py-8 rounded-3xl border-2 shadow-2xl text-center backdrop-blur-xl ${
+                goalCelebration.team === homeTeam
+                  ? 'bg-emerald-950/90 border-emerald-400/70 shadow-emerald-500/30'
+                  : 'bg-rose-950/90 border-rose-400/70 shadow-rose-500/30'
+              }`}
+            >
+              <motion.div
+                animate={{ rotate: [0, 360] }}
+                transition={{ duration: 0.9, ease: 'easeOut' }}
+                className="text-6xl mb-2"
+              >
+                ⚽
+              </motion.div>
+              <div className="text-5xl font-extrabold tracking-tight text-white drop-shadow-lg">
+                GOAL!
+              </div>
+              <div className={`mt-2 text-xl font-bold ${
+                goalCelebration.team === homeTeam ? 'text-emerald-300' : 'text-rose-300'
+              }`}>
+                {goalCelebration.player}
+              </div>
+              <div className="text-sm text-white/60">
+                {goalCelebration.team} · {goalCelebration.minute}'
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="mb-8">
         <h1 className="text-4xl font-bold text-white mb-4 flex items-center gap-3">
           <Zap className="text-primary-400" />
@@ -597,7 +292,7 @@ const MatchSimulator: React.FC = () => {
       {/* Main 3-column layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         {/* Left column: Team selection */}
-        <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700 h-[600px]">
+        <div className="card-glass p-6 min-h-[600px]">
           <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
             <Target className="text-primary-400" />
             Select Teams
@@ -611,7 +306,7 @@ const MatchSimulator: React.FC = () => {
               <select
                 value={homeTeam}
                 onChange={(e) => setHomeTeam(e.target.value)}
-                className="w-full bg-gray-900 text-white border border-gray-700 rounded-lg p-3"
+                className="w-full bg-[#04100a] text-white border border-emerald-800/50 rounded-xl p-3 focus:border-emerald-500 focus:outline-none transition-colors duration-200"
               >
                 <option value="">Select team</option>
                 {teams.map((team) => (
@@ -631,7 +326,7 @@ const MatchSimulator: React.FC = () => {
               <select
                 value={awayTeam}
                 onChange={(e) => setAwayTeam(e.target.value)}
-                className="w-full bg-gray-900 text-white border border-gray-700 rounded-lg p-3"
+                className="w-full bg-[#04100a] text-white border border-emerald-800/50 rounded-xl p-3 focus:border-emerald-500 focus:outline-none transition-colors duration-200"
               >
                 <option value="">Select team</option>
                 {teams.map((team) => (
@@ -650,7 +345,7 @@ const MatchSimulator: React.FC = () => {
                   <button
                     onClick={() => simulateMatch(false)}
                     disabled={!homeTeam || !awayTeam || isSimulating}
-                    className="py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors text-sm"
+                    className="py-3 px-4 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-emerald-900/50 active:scale-95 text-sm"
                   >
                     Quick Sim
                   </button>
@@ -660,7 +355,7 @@ const MatchSimulator: React.FC = () => {
                       simulateMatch(true)
                     }}
                     disabled={!homeTeam || !awayTeam || isSimulating}
-                    className="py-3 px-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors text-sm"
+                    className="py-3 px-4 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-teal-900/50 active:scale-95 text-sm"
                   >
                     Live Sim
                   </button>
@@ -677,7 +372,7 @@ const MatchSimulator: React.FC = () => {
                       className={`py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
                         simulationSpeed === 1000 
                           ? 'bg-primary-600 text-white' 
-                          : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                          : 'bg-emerald-950/60 text-emerald-100/60 hover:bg-emerald-900/50'
                       }`}
                     >
                       Slow
@@ -687,7 +382,7 @@ const MatchSimulator: React.FC = () => {
                       className={`py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
                         simulationSpeed === 200 
                           ? 'bg-primary-600 text-white' 
-                          : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                          : 'bg-emerald-950/60 text-emerald-100/60 hover:bg-emerald-900/50'
                       }`}
                     >
                       Normal
@@ -697,7 +392,7 @@ const MatchSimulator: React.FC = () => {
                       className={`py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
                         simulationSpeed === 100 
                           ? 'bg-primary-600 text-white' 
-                          : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                          : 'bg-emerald-950/60 text-emerald-100/60 hover:bg-emerald-900/50'
                       }`}
                     >
                       Fast
@@ -731,28 +426,35 @@ const MatchSimulator: React.FC = () => {
         </div>
         
         {/* Middle column: Score and minute */}
-        <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700 h-[600px]">
+        <div className="card-glass p-6 min-h-[600px]">
           {match ? (
             <div className="space-y-6">
-              <div className="flex justify-center items-center">
-                <div className="text-center px-4">
-                  <div className="text-xl font-bold text-white">{homeTeam}</div>
-                  <div className="text-4xl font-bold text-primary-400 mt-2">{liveScore.home}</div>
+              {isLiveMode && currentMinute < 90 && (
+                <div className="flex justify-center">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/15 px-3 py-1 text-xs font-bold uppercase tracking-widest text-red-400">
+                    <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
+                    Live
+                  </span>
                 </div>
-                
-                <div className="px-4">
-                  <div className="text-xl text-gray-400 mb-2">VS</div>
+              )}
+
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                <div className="text-center min-w-0">
+                  <div className="truncate text-lg font-bold text-white">{homeTeam}</div>
+                  <div key={`h-${liveScore.home}`} className="mt-2 text-5xl font-extrabold tabular-nums text-primary-400 score-pop">{liveScore.home}</div>
                 </div>
-                
-                <div className="text-center px-4">
-                  <div className="text-xl font-bold text-white">{awayTeam}</div>
-                  <div className="text-4xl font-bold text-primary-400 mt-2">{liveScore.away}</div>
+
+                <div className="text-2xl font-light text-emerald-700">–</div>
+
+                <div className="text-center min-w-0">
+                  <div className="truncate text-lg font-bold text-white">{awayTeam}</div>
+                  <div key={`a-${liveScore.away}`} className="mt-2 text-5xl font-extrabold tabular-nums text-primary-400 score-pop">{liveScore.away}</div>
                 </div>
               </div>
-              
+
               <div className="flex justify-center items-center">
-                <div className="bg-gray-700/50 px-6 py-2 rounded-full">
-                  <span className="font-bold text-xl text-white">{currentMinute < 90 ? currentMinute : 90}'</span>
+                <div className="bg-emerald-950/70 border border-emerald-700/40 px-6 py-2 rounded-full">
+                  <span className="font-bold text-xl text-white tabular-nums">{currentMinute < 90 ? currentMinute : 90}'</span>
                 </div>
               </div>
               
@@ -764,7 +466,7 @@ const MatchSimulator: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-white w-8 text-left">{liveStats.possession_home}%</span>
-                    <div className="flex-1 bg-gray-700 rounded-full h-2">
+                    <div className="flex-1 bg-emerald-950/80 rounded-full h-2">
                       <div 
                         className="bg-blue-500 h-2 rounded-full transition-all duration-500" 
                         style={{width: `${liveStats.possession_home}%`}}
@@ -781,7 +483,7 @@ const MatchSimulator: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-white w-8 text-left">{liveStats.shots_home}</span>
-                    <div className="flex-1 bg-gray-700 rounded-full h-2">
+                    <div className="flex-1 bg-emerald-950/80 rounded-full h-2">
                       <div 
                         className="bg-green-500 h-2 rounded-full transition-all duration-500" 
                         style={{width: `${liveStats.shots_home / Math.max(liveStats.shots_home + liveStats.shots_away, 1) * 100}%`}}
@@ -798,7 +500,7 @@ const MatchSimulator: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-white w-8 text-left">{liveStats.shots_on_target_home}</span>
-                    <div className="flex-1 bg-gray-700 rounded-full h-2">
+                    <div className="flex-1 bg-emerald-950/80 rounded-full h-2">
                       <div 
                         className="bg-yellow-500 h-2 rounded-full transition-all duration-500" 
                         style={{width: `${liveStats.shots_on_target_home / Math.max(liveStats.shots_on_target_home + liveStats.shots_on_target_away, 1) * 100}%`}}
@@ -815,7 +517,7 @@ const MatchSimulator: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-white w-8 text-left">{match?.events?.filter(e => e.event_type === 'corner' && e.team === homeTeam).length || 0}</span>
-                    <div className="flex-1 bg-gray-700 rounded-full h-2">
+                    <div className="flex-1 bg-emerald-950/80 rounded-full h-2">
                       <div 
                         className="bg-purple-500 h-2 rounded-full transition-all duration-500" 
                         style={{width: `${(match?.events?.filter(e => e.event_type === 'corner' && e.team === homeTeam).length || 0) / Math.max((match?.events?.filter(e => e.event_type === 'corner').length || 1), 1) * 100}%`}}
@@ -832,7 +534,7 @@ const MatchSimulator: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-white w-8 text-left">{match?.events?.filter(e => e.event_type === 'yellow_card' && e.team === homeTeam).length || 0}</span>
-                    <div className="flex-1 bg-gray-700 rounded-full h-2">
+                    <div className="flex-1 bg-emerald-950/80 rounded-full h-2">
                       <div 
                         className="bg-yellow-400 h-2 rounded-full transition-all duration-500" 
                         style={{width: `${(match?.events?.filter(e => e.event_type === 'yellow_card' && e.team === homeTeam).length || 0) / Math.max((match?.events?.filter(e => e.event_type === 'yellow_card').length || 1), 1) * 100}%`}}
@@ -849,7 +551,7 @@ const MatchSimulator: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-white w-8 text-left">{match?.events?.filter(e => e.event_type === 'red_card' && e.team === homeTeam).length || 0}</span>
-                    <div className="flex-1 bg-gray-700 rounded-full h-2">
+                    <div className="flex-1 bg-emerald-950/80 rounded-full h-2">
                       <div 
                         className="bg-red-500 h-2 rounded-full transition-all duration-500" 
                         style={{width: `${(match?.events?.filter(e => e.event_type === 'red_card' && e.team === homeTeam).length || 0) / Math.max((match?.events?.filter(e => e.event_type === 'red_card').length || 1), 1) * 100}%`}}
@@ -868,7 +570,7 @@ const MatchSimulator: React.FC = () => {
         </div>
         
         {/* Right column: Events */}
-        <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700 h-[600px]">
+        <div className="card-glass p-6 min-h-[600px]">
           <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
             <Activity className="text-primary-400" />
             Match Events
@@ -877,7 +579,7 @@ const MatchSimulator: React.FC = () => {
           {visibleEvents.length > 0 ? (
             <div className="space-y-4">
               {/* Event Summary */}
-              <div className="bg-gray-700/30 rounded-lg p-4 space-y-3">
+              <div className="bg-emerald-950/50 rounded-xl p-4 space-y-3 border border-emerald-800/30">
                 <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">Event Summary</h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div className="space-y-1">
@@ -905,8 +607,13 @@ const MatchSimulator: React.FC = () => {
 
               {/* Events List */}
               <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
-                {visibleEvents.slice().reverse().map((event, index) => (
-                  <div key={index} className="flex items-start gap-3 p-3 bg-gray-700/50 rounded-lg hover:bg-gray-700/70 transition-colors">
+                {visibleEvents.slice().reverse().map((event) => (
+                  <motion.div
+                    key={`${event.minute}-${event.event_type}-${event.player}`}
+                    initial={{ opacity: 0, x: 24 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.35, ease: 'easeOut' }}
+                    className="flex items-start gap-3 p-3 bg-emerald-950/50 rounded-xl hover:bg-emerald-900/40 transition-all duration-300">
                     <div className="text-xl mt-1">{renderEventIcon(event.event_type)}</div>
                     <div className="flex-1">
                       <div className="font-medium text-white">
@@ -925,7 +632,7 @@ const MatchSimulator: React.FC = () => {
                         </div>
                       )}
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             </div>
@@ -943,68 +650,21 @@ const MatchSimulator: React.FC = () => {
       </div>
 
       {/* Football Field with Formations - Always Visible */}
-      <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700 mt-8">
+      <div className="card-glass p-6 mt-8">
         <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
           <Users className="text-primary-400" />
           {(homeTeam && awayTeam) ? 'Match Formations' : 'Football Pitch'}
         </h3>
         
-        {/* Enhanced football field with horizontal formations */}
-        <div className="relative border-2 border-white rounded-lg bg-gradient-to-br from-[#2a7828] to-[#1e5a1e] aspect-[2/1] p-4 overflow-hidden shadow-2xl">
-          {/* Field markings */}
-          <div className="absolute inset-0">
-            {/* Center circle */}
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[25%] h-[50%] rounded-full border-2 border-white"></div>
-            {/* Center dot */}
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-white"></div>
-            {/* Center line */}
-            <div className="absolute top-0 bottom-0 left-1/2 transform -translate-x-1/2 w-0.5 bg-white"></div>
-            
-            {/* Left penalty area */}
-            <div className="absolute top-1/2 left-0 transform -translate-y-1/2 w-[18%] h-[55%] border-r-2 border-t-2 border-b-2 border-white"></div>
-            {/* Right penalty area */}
-            <div className="absolute top-1/2 right-0 transform -translate-y-1/2 w-[18%] h-[55%] border-l-2 border-t-2 border-b-2 border-white"></div>
-            
-            {/* Left goal area */}
-            <div className="absolute top-1/2 left-0 transform -translate-y-1/2 w-[8%] h-[25%] border-r-2 border-t-2 border-b-2 border-white"></div>
-            {/* Right goal area */}
-            <div className="absolute top-1/2 right-0 transform -translate-y-1/2 w-[8%] h-[25%] border-l-2 border-t-2 border-b-2 border-white"></div>
-            
-            {/* Goals */}
-            <div className="absolute top-1/2 left-0 transform -translate-y-1/2 -translate-x-full w-3 h-[20%] bg-white border border-gray-300"></div>
-            <div className="absolute top-1/2 right-0 transform -translate-y-1/2 translate-x-full w-3 h-[20%] bg-white border border-gray-300"></div>
-            
-            {/* Corner arcs */}
-            <div className="absolute top-0 left-0 w-4 h-4 border-r-2 border-b-2 border-white rounded-br-full"></div>
-            <div className="absolute top-0 right-0 w-4 h-4 border-l-2 border-b-2 border-white rounded-bl-full"></div>
-            <div className="absolute bottom-0 left-0 w-4 h-4 border-r-2 border-t-2 border-white rounded-tr-full"></div>
-            <div className="absolute bottom-0 right-0 w-4 h-4 border-l-2 border-t-2 border-white rounded-tl-full"></div>
-            
-            {/* Penalty spots */}
-            <div className="absolute top-1/2 left-[12%] transform -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-white"></div>
-            <div className="absolute top-1/2 right-[12%] transform translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-white"></div>
-          </div>
-
-          {/* Home team formation (left side) */}
-          <div className="absolute inset-y-0 left-0 w-[48%] px-4">
-            {homeLineup.length > 0 && renderFormation(homeLineup, homeTeam, true, homeFormation)}
-          </div>
-          
-          {/* Away team formation (right side) */}
-          <div className="absolute inset-y-0 right-0 w-[48%] px-4">
-            {awayLineup.length > 0 && renderFormation(awayLineup, awayTeam, false, awayFormation)}
-          </div>
-
-          {/* Empty pitch message when no teams selected */}
-          {(!homeTeam || !awayTeam) && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-white/60 text-center">
-                <div className="text-4xl mb-2">⚽</div>
-                <div className="text-lg font-medium">Select teams to see formations</div>
-              </div>
-            </div>
-          )}
-        </div>
+        <FormationPitch
+          homeTeam={homeTeam}
+          awayTeam={awayTeam}
+          homeLineup={homeLineup}
+          awayLineup={awayLineup}
+          homeFormation={homeFormation}
+          awayFormation={awayFormation}
+          events={match?.events}
+        />
       </div>
     </div>
   )

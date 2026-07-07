@@ -2,14 +2,15 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
-  Trophy, 
-  Users, 
-  Zap, 
-  BarChart3, 
+  Trophy,
+  Users,
+  Zap,
+  BarChart3,
   Settings,
   Menu,
   X,
-  Gamepad2
+  Gamepad2,
+  BrainCircuit
 } from 'lucide-react';
 
 interface NavItem {
@@ -26,6 +27,7 @@ const Navbar: React.FC = () => {
     { name: 'Home', path: '/', icon: <Trophy size={20} /> },
     { name: 'Teams', path: '/teams', icon: <Users size={20} /> },
     { name: 'Simulator', path: '/simulator', icon: <Zap size={20} /> },
+    { name: 'Predictions', path: '/predictions', icon: <BrainCircuit size={20} /> },
     { name: 'Tournament', path: '/tournament', icon: <Gamepad2 size={20} /> },
     { name: 'Stats', path: '/stats', icon: <BarChart3 size={20} /> },
   ];
@@ -33,7 +35,7 @@ const Navbar: React.FC = () => {
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/10 backdrop-blur-md border-b border-white/20">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-[#04100a]/80 backdrop-blur-xl border-b border-emerald-800/40">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
@@ -41,9 +43,9 @@ const Navbar: React.FC = () => {
             <motion.div
               whileHover={{ rotate: 360 }}
               transition={{ duration: 0.5 }}
-              className="p-2 bg-white/20 rounded-lg"
+              className="p-2 bg-emerald-500/15 border border-emerald-500/30 rounded-xl"
             >
-              <Trophy className="h-8 w-8 text-white" />
+              <Trophy className="h-8 w-8 text-emerald-300" />
             </motion.div>
             <div className="hidden sm:block">
               <h1 className="text-xl font-bold text-white">
@@ -63,9 +65,9 @@ const Navbar: React.FC = () => {
                     whileTap={{ scale: 0.95 }}
                     className={`
                       relative px-4 py-2 rounded-lg flex items-center space-x-2 transition-all duration-200
-                      ${isActive(item.path) 
-                        ? 'bg-white/20 text-white shadow-glow' 
-                        : 'text-green-100 hover:bg-white/10 hover:text-white'
+                      ${isActive(item.path)
+                        ? 'bg-emerald-500/15 text-emerald-300 shadow-glow'
+                        : 'text-emerald-100/70 hover:bg-emerald-500/10 hover:text-white'
                       }
                     `}
                   >

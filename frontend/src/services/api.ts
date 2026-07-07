@@ -107,6 +107,31 @@ export const footballApi = {
     const response = await api.get('/stats');
     return response.data;
   },
+
+  // --- Real-data prediction engine (/engine) ---
+  async getEngineTeams(): Promise<{ club: Record<string, string[]>; international: string[] }> {
+    const response = await api.get('/engine/teams');
+    return response.data;
+  },
+
+  async getEnginePrediction(request: {
+    home_team: string;
+    away_team: string;
+    scope: 'club' | 'international';
+    neutral?: boolean;
+    bookmaker_odds?: { home?: number; draw?: number; away?: number };
+    home_lineup?: string[];
+    away_lineup?: string[];
+  }): Promise<any> {
+    // Model fitting on first call can take ~30s; give it room
+    const response = await api.post('/engine/predict', request, { timeout: 120000 });
+    return response.data;
+  },
+
+  async getEngineBacktest(): Promise<any[]> {
+    const response = await api.get('/engine/backtest');
+    return response.data;
+  },
 };
 
 export default footballApi;
